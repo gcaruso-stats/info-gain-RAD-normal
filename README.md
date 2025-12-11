@@ -5,10 +5,10 @@ This repository contains R functions to implement the procedures presented in th
 
 ## Repository Structure
 
-- `R/`
-  - `main_functions.R` – All core functions with comments
-  - `run_trials_univ.R` – Code to run single-trial and multi-trials simulations under the WE design (univariate endpoint)
-  - `run_trials_multiv.R` – Code to run single-trial and multi-trials simulations under the WE design (multivariate endpoint)
+- `info-gain-RAD-normal/`
+  - `WE_main_functions.R` – All core functions to run procedures described in the paper.
+  - `run_trials_univ.R` – Code to run single-trial and multi-trials simulations under the WE design (univariate endpoint).
+  - `run_trials_multiv.R` – Code to run single-trial and multi-trials simulations under the WE design (multivariate endpoint).
 
 ## Main Functions
 
