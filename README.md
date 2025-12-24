@@ -6,36 +6,33 @@ This repository contains R functions to implement the procedures presented in th
 ## Repository Structure
 
 - `info-gain-RAD-normal/`
-  - `WE_main_functions_univ.R` – All core functions to run procedures described in the paper (univariate case)
-  - `WE_main_functions_multiv.R` – All core functions to run procedures described in the paper (multivariate case)
+  - `WE_main_functions_univ.R` – All core functions to run procedures described in the paper (univariate case).
   - `run_trials_univ.R` – Code to run single-trial and multi-trials simulations under all the considered designs (univariate endpoint).
+  - `WE_main_functions_multiv.R` – All core functions to run procedures described in the paper (multivariate case)
   - `run_trials_multiv.R` – Code to run single-trial and multi-trials simulations under all the considered designs (multivariate endpoint).
+  - `gittinsTableFull.csv` - Values for the normalised Gittins Index from the table 8.1 in Gittins et al. (2011, p.261-262); missing rows in the table have been estimated via linear interpolation.
 
 ## Main Functions (both univariate and multivariate)
 
-1. **Weight function**  
-   Computes the symmetric weight function with Gaussian kernel introduced in the paper.
+1. **Weight function**: computes the symmetric weight function with Gaussian kernel introduced in the paper.
 
-2. **Shannon entropies**  
-   Computes the unweighted and weighted Shannon entropy of a normal distribution. 
+2. **Shannon entropies**: computes the unweighted and weighted Shannon entropy of a normal distribution. 
 
-3. **Information gain**  
-   Computes the information gain as the difference between the unweighted Shannon entropy and the weighted Shannon entropy.
+3. **Information gain**: computes the information gain as the difference between the unweighted Shannon entropy and the weighted Shannon entropy.
 
-4. **Single trial simulation**  
-   Runs a single trial under the specified design.
+4. **Single trial simulation**: runs a single trial under the specified design.
 
-5. **Bayesian hypothesis testing**  
-   Performs Bayesian decision-making for a single trial realization (`Monte Carlo procedure A` - details in the paper).
+5. **Summaries of the single trial**: computes several summaries for a single trial.
 
-6. **Frequentist probability of rejection**  
-   Computes the probability of rejecting the null hypothesis (`Monte Carlo procedure B` - details in the paper).
+7. **Bayesian hypothesis testing**: performs Bayesian decision-making for a single trial realization (`Monte Carlo procedure A` - details in the paper).
 
-7. **Derive critical values**  
-   Calculates critical values to achieve strong or mean type-I error control across a grid of null scenarios.
+8. **Multiple trial simulation**: runs multiple trial replicates under the specified design.
 
-8. **Robust kappa selection**  
-   Selects a robust value of kappa over a grid of candidate values.
+9. **Operating characteristics over many replicates**: compute operating characteristics over many trial replicates. The probability of rejecting the null hypothesis is computed following `Monte Carlo procedure B` (details in the paper).
+
+10. **Derive critical values**: calculates critical values to achieve strong or mean type-I error control across a grid of null scenarios.
+
+11. **Robust kappa selection**: selects a robust value of kappa over a grid of candidate values.
 
 
 
