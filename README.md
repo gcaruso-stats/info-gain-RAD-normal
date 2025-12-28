@@ -2,6 +2,8 @@
 
 This repository contains R functions to implement the procedures presented in the original paper *A response-adaptive multi-arm design for continuous endpoints based on a weighted information measure* by G. Caruso and P. Mozgunov (2024+).
 
+**Status:** this repository is under active development. Core components of the methodology presented in the paper are available, while remaining parts are being polished, commented and added progressively.
+
 
 ## Repository Structure
 
