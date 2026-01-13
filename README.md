@@ -10,11 +10,11 @@ This repository contains R functions to implement the procedures presented in th
 - `info-gain-RAD-normal/`
   - `WE_main_functions_univ.R` – All core functions to run procedures described in the paper (univariate case).
   - `run_trials_univ.R` – Code to run single-trial and multi-trials simulations under all the considered designs (univariate endpoint).
-  - `WE_main_functions_multiv.R` – All core functions to run procedures described in the paper (multivariate case)
-  - `run_trials_multiv.R` – Code to run single-trial and multi-trials simulations under all the considered designs (multivariate endpoint).
+  <!-- - `WE_main_functions_multiv.R` – All core functions to run procedures described in the paper (multivariate case). -->
+  <!-- - `run_trials_multiv.R` – Code to run single-trial and multi-trials simulations under all the considered designs (multivariate endpoint). -->
   - `gittinsTableFull.csv` - Values for the normalised Gittins Index from the table 8.1 in Gittins et al. (2011, p.261-262); missing rows in the table have been estimated via linear interpolation.
 
-## Main Functions (both univariate and multivariate)
+## Main Functions <!-- (both univariate and multivariate) -->
 
 1. **Weight function**: computes the symmetric weight function with Gaussian kernel introduced in the paper.
 
