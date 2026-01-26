@@ -4,9 +4,7 @@ source("WE_main_functions_univ.R") #load main functions
 ## Run one trial replicate for each design and analyze the output (univariate case)
 ## ================================================================================
 
-## ------------------------
-## GLOBAL TRIAL SETTINGS
-## ------------------------
+## General trial settings
 
 N = 100                 # total sample size
 K = 4                   # number of arms
@@ -18,13 +16,11 @@ gamma = rep(0,4)  # target value (always the same for all arms)
 idxBest = which.min(abs(mu-gamma)) # index of the best arm
 
 areSigma0Known = TRUE
-initialSizePerArm = 5
+initialSizePerArm = 5 #burn-is size (can be changed)
 
-## ------------------------
-## DESIGN-SPECIFIC SETTINGS
-## ------------------------
+## Design-specific settings
 
-parDesign_RAD = list(  # feel free to change parameters 
+parDesign_RAD = list(  # parameters can be changed 
   kappa = 0.7,
   p = 2,
   out = list()
@@ -43,14 +39,12 @@ parDesign_GI_targ = list(
 )
 
 parDesign_TS = list(
-  MCiter = 2e3, #HIGH VALUES ARE TIME CONSUMING - default is 2e4
+  MCiter = 2e3, #HIGH VALUES ARE TIME CONSUMING - default in paper simulations is 2e4
   random = TRUE,
   out = list()
 )
 
-## ------------------------
-## RUN SINGLE TRIALS
-## ------------------------
+## Run single trials
 
 results = list()
 seed = 123
@@ -186,9 +180,7 @@ results$TS = list(
   summary = summary_TS
 )
 
-## ----------------------------------
-## QUICK COMPARISON ON SINGLE TRIALS
-## ----------------------------------
+## Quick comparison on single trials (table format)
 
 
 sapply(results, function(res) {
@@ -273,3 +265,56 @@ OC_table = t(sapply(names(OCs),
              )
 
 print(OC_table)
+
+
+
+## ===================================================================
+## Compute critical values given the set of null scenarios of interest
+## ===================================================================
+
+library(doParallel)
+library(doRNG)
+
+# Simple trial setup
+K = 4                     
+N = 100                    
+M = 1e3         # small value for quick run (this should be ideally increase)
+gamma = rep(0, K)    
+sigma0 = c(rep(2,K-1), 4)
+
+# Define null configurations (all mu's equal)
+upperLimit = 10 * max(sigma0)
+grid = seq(0, sqrt(upperLimit), length = 15)^2  # spacing on squared scale
+muNull = matrix(rep(grid, K), ncol = K, byrow = FALSE)
+
+# Convert to list of null scenarios
+nullScenarios = lapply(1:nrow(muNull), function(i) list(mu = muNull[i, ], sigma = sigma0))
+
+ncores = min(length(nullScenarios), detectCores() - 1)
+
+# Run critical value search (FR design)
+critValue_FR = criticalValueSearchBayes(M = M, K = K, N = N,
+                                        nullScenarios = nullScenarios, gamma = gamma,
+                                        areSigma0Known = TRUE, initialSizePerArm = 5,
+                                        design = "FR", parDesign = NULL,
+                                        alphaTarg = 0.05,
+                                        ncores = ncores,
+                                        seed = 123
+)
+
+
+## Inspection of results
+
+# cut-off probability values
+
+critValue_FR$cvStrongControl$etaMax # strong control of TIE at 5%
+critValue_FR$cvMeanControl$etaMean # mean control of TIE at 5%
+
+# scenario-specific TIE rates with strong control at 5%
+critValue_FR$cvStrongControl$alphaSingles   
+
+# scenario-specific TIE rates with mean control at 5%
+critValue_FR$cvMeanControl$alphaSingles   
+
+# prob.1bestVS2best (piHat) under H0: mu_j-gamma=0, for all j
+hist(critValue_FR$TSbayes_Null[1,])  
