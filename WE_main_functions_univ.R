@@ -469,55 +469,45 @@ computeTrialSummaries = function(trialOut) {
   gamma = trialOut$trialDetails$gamma
   sigma0 = trialOut$trialDetails$sigma0
   
+  areSigma0Known =  trialOut$areSigma0Known
+  
   trueBestArm = trialOut$trialDetails$trueBestArm
   trueSecondBestArm = trialOut$trialDetails$trueSecondBestArm
   
   K = length(mu)
   N = sum(n)
   
-  ## ------------------------
-  ## SAMPLE MEANS AND SDs
-  ## ------------------------
+  # Sample means and sd's
   
   aveResponseByArm = colMeans(x, na.rm = TRUE)
   sdResponseByArm = apply(x, 2, sd, na.rm = TRUE)
   
-  ## ------------------------
-  ## FINAL ARM RECOMMENDATIONS
-  ## ------------------------
+  # final arm recommendations
   
   selectedBestArm = which.min(abs(aveResponseByArm - gamma))
   selectedSecondBestArm = which(abs(aveResponseByArm - gamma) == sort(abs(aveResponseByArm - gamma))[2])[1]
   
-  ## ------------------------
-  ## PERFORMANCE INDICATORS
-  ## ------------------------
+  # Correct selection
   
   correctSelectionBest = as.integer(selectedBestArm == trueBestArm)
   correctSelectionSecondBest = as.integer(selectedSecondBestArm == trueSecondBestArm)
   correctSelectionTop2 = correctSelectionBest * correctSelectionSecondBest #1 iff top2 correctly identified; 0, otherwise
   
-  ## ------------------------
-  ## DISTANCES FROM TARGET
-  ## ------------------------
+  # Distances from target
   
   trueDistanceToTarget = abs(mu - gamma)
   estimatedDistanceToTarget = abs(aveResponseByArm - gamma)
   
-  ## ------------------------
-  ## BAYESIAN TEST 
-  ## ------------------------
+  # Bayesian test
   
   postProb_1bestVS2best = prob.1bestVS2best(xBar = aveResponseByArm,
                                             gamma = gamma,
-                                            sigma0 = ifelse(rep(areSigma0Known, 4), 
+                                            sigma0 = ifelse(rep(areSigma0Known, K), 
                                                             sigma0, 
                                                             sdResponseByArm),
                                             n = n)
   
-  ## ------------------------
-  ## OUTPUT
-  ## ------------------------
+  # Output
   
   outSummary = list(
     
@@ -550,19 +540,19 @@ computeTrialSummaries = function(trialOut) {
 }
 
 ## Run multiple trials ----
-##
-## This function runs multiple (M) trial replicates. 
-##
-## Inputs:
-##   M                         - number of simulated trial replicates
-##   N, K, mu, sigma0, gamma   - trial parameters
-##   design, parDesign         - design specification
-##   seed                      - RNG seed for reproducibility
-##
-## Output:
-##   A list with:
-##     - trials: list of M trial objects (output of runTrial)
-##     - elapsedTime: total simulation time
+#
+# This function runs multiple (M) trial replicates. 
+#
+# Inputs:
+#   M                         - number of simulated trial replicates
+#   N, K, mu, sigma0, gamma   - trial parameters
+#   design, parDesign         - design specification
+#   seed                      - RNG seed for reproducibility
+#
+# Output:
+#   A list with:
+#     - trials: list of M trial objects (output of runTrial)
+#     - elapsedTime: total simulation time
 
 runMultipleTrials = function(M = 5e2,
                              N,
@@ -607,61 +597,51 @@ runMultipleTrials = function(M = 5e2,
 }
 
 ## Operating characteristics over many replicates (Monte Carlo procedure B embedded here) ----
-##
-## This function computes operating characteristics over many trial replicates. 
-## It embeds Monte Carlo procedure B to compute frequentist rejection rates.
-##
-## Inputs:
-##   trials      - list of trial objects (output of runTrial)
-##   critValue   - vector of frequentist critical values (optional)
-##   cutoffProb  - vector of Bayesian posterior probability cutoffs
-##
-## Output:
-##   List of operating characteristics:
-##     - allocation summaries
-##     - selection probabilities
-##     - response and target-distance metrics
-##     - Bayesian power (naive, two-comp, conditional)
+#
+# This function computes operating characteristics over many trial replicates. 
+# It embeds Monte Carlo procedure B to compute frequentist rejection rates.
+#
+# Inputs:
+#   trials      - list of trial objects (output of runTrial)
+#   critValue   - vector of frequentist critical values (optional)
+#   cutoffProb  - vector of Bayesian posterior probability cutoffs
+#
+# Output:
+#   List of operating characteristics:
+#     - allocation summaries
+#     - selection probabilities
+#     - response and target-distance metrics
+#     - Bayesian power (naive, two-comp, conditional)
 
 computeOCs = function(trials, cutoffProb = NULL) {
   
   M = length(trials)
   K = trials[[1]]$summary$K
   
-  ## ------------------------
-  ## Allocation summaries
-  ## ------------------------
+  # Allocation summaries
   
   nPercentMat = sapply(trials, function(x) x$summary$nByArm)
   
   armPerc_average = rowMeans(nPercentMat)
   armPerc_SE = apply(nPercentMat, 1, sd) / sqrt(M)
   
-  ## ------------------------
-  ## Final recommendation
-  ## ------------------------
+  # Final recommendation
   
   armFinal = sapply(trials, function(x) x$summary$selectedBestArm)
   armFinalPerc_average = table(factor(armFinal, levels = 1:K)) / M * 100
   armFinalModal = as.numeric(which.max(armFinalPerc_average))
   
-  ## ------------------------
-  ## Average responses by arm
-  ## ------------------------
+  # Average responses by arm
   
   aveResponse = rowMeans(sapply(trials, function(x) x$summary$aveResponseByArm))
   response_SE = apply(sapply(trials, function(x) x$summary$aveResponseByArm), 1, sd) / sqrt(M)
   
-  ## --------------------------------
-  ## Average distance from the target
-  ## --------------------------------
+  # Average distance from the target
   
   aveTargetDistance = rowMeans(sapply(trials, function(x) x$summary$estimatedDistanceToTarget))
   targetDistance_SE = apply(sapply(trials, function(x) x$summary$estimatedDistanceToTarget), 1, sd) / sqrt(M)
   
-  ## ----------------------------------
-  ## Correct identification best arm(s)
-  ## ----------------------------------
+  # Correct identification best arm(s)
   
   selectionBest = sapply(trials, function(x) x$summary$correctSelectionBest) #1 if best arm correctly identified; 0, otherwise
   selectionSecondBest = sapply(trials, function(x) x$summary$correctSelectionSecondBest) #1 if second best arm correctly identified; 0, otherwise
@@ -671,9 +651,7 @@ computeOCs = function(trials, cutoffProb = NULL) {
   percSelectionSecondBest = mean(selectionSecondBest)
   percSelectionTop2 = mean(selectionTop2)
   
-  ## ---------------------------------------------------
-  ## Frequentist rejection rates (power or type-I error)
-  ## ---------------------------------------------------
+  # Frequentist rejection rates (power or type-I error)
   
   TS_bayes = sapply(trials, function(x) x$summary$postProb_1bestVS2best)
   TScond_bayes = ifelse(selectionTop2, TS_bayes, NA)
@@ -701,3 +679,135 @@ computeOCs = function(trials, cutoffProb = NULL) {
   ))
 }
 
+
+## Cut-off probability search for Bayesian hypothesis testing ----
+#
+# This function calculates critical values to achieve strong or 
+# mean type-I error control across a grid of null scenarios when  
+# Bayesian hypothesis testing (prob.1bestVS2best) is performed.
+#
+# Inputs:
+#   M                 - number of simulated trials per null scenario
+#   K                 - number of arms
+#   N                 - total sample size
+#   nullScenarios     - list of null scenarios; each element is a list 
+#                       containing a vector of true means 'mu' (length K) and 
+#                       a vector of true standard deviations 'sigma' (length K)
+#   gamma             - vector of target values (length K)
+#   areSigma0Known    - logical; whether variances are known or not
+#   initialSizePerArm - burn-in sample size per arm
+#   design            - trial design ("FR","CB","RAD","GI","TS") - more details 
+#                       can be found in 'Run a single trial' section
+#   parDesign         - design-specific parameters - more details 
+#                       can be found in 'Run a single trial' section
+#   alphaTarg         - maximum or average (across the set of null scenarios) 
+#                       tolerated type-I-error rate (TIE)
+#   alphaMaxSingle    - maximum tolerated TIE on a single scenario; 
+#                       this cap may avoid extreme type-I error rates on single
+#                       scenarios, when cut-off values are derived based on average TIE
+#                       (default is 1, i.e. no cap)
+#   ncores            - number of cores for parallel computing
+#   seed              - RNG seed for reproducibility
+#
+# Output:
+#   A list containing:
+#     - draws from posterior probabilities (prob.1bestVS2best) under the null scenarios 
+#     - cut-off probabilities ensuring strong and mean type-I error control
+#     - scenario-specific type-I error rates
+#     - elapsed computing time
+
+criticalValueSearchBayes = function(M, K, N,
+                                    nullScenarios, gamma,
+                                    areSigma0Known = FALSE, initialSizePerArm = 2,
+                                    design, parDesign = NULL, 
+                                    alphaTarg = 0.05, alphaMaxSingle = 1,
+                                    ncores = NULL,
+                                    seed = 123) {
+  
+  set.seed(seed)
+  startTime = Sys.time()
+  
+  # Parallel setup
+  
+  require(doParallel)
+  require(doRNG)
+  
+  if (is.null(ncores)) {
+    ncores = detectCores() - 1
+  }
+  
+  cl = makeCluster(ncores, outfile = "")
+  registerDoParallel(cl)
+  
+  # Simulate null scenarios
+  
+  bayesNull = foreach(i = seq_along(nullScenarios),
+                      .export = c("computeTrialSummaries", "runTrial", "prob.1bestVS2best"),
+                      .inorder = TRUE) %dorng% {
+    
+    trials = replicate(M,
+                       runTrial(N = N, K = K,
+                                mu = nullScenarios[[i]]$mu, 
+                                sigma0 = nullScenarios[[i]]$sigma,
+                                gamma = gamma,
+                                areSigma0Known = areSigma0Known,
+                                initialSizePerArm = initialSizePerArm,
+                                design = design,
+                                parDesign = parDesign),
+                       simplify = FALSE)
+    
+    summaries = sapply(trials, 
+                       function(s) computeTrialSummaries(s)$postProb_1bestVS2best)
+
+  }
+  
+  stopCluster(cl)
+  
+  TSbayes_Null = do.call(rbind, bayesNull)  # rows are scenarios, cols are trial replicates
+  
+  # Strong type-I error control
+  
+  eta = apply(TSbayes_Null, 1, function(x) quantile(x, probs = 1 - alphaTarg))
+  etaMax = max(eta)
+  cvStrongControl = list(eta = eta,
+                         etaMax = etaMax,
+                         alphaSingles = rowMeans(TSbayes_Null > etaMax))
+  
+  # Mean type-I error control
+  
+  etaGrid = seq(from = max(apply(TSbayes_Null, 1,
+                                 function(x) quantile(x, probs = 1 - alphaMaxSingle))),
+                to = max(TSbayes_Null),
+                length.out = 2000 #this allows to have a fine grid
+                )
+  
+  alphaMeanGrid = sapply(etaGrid,
+                         function(e) mean(rowMeans(TSbayes_Null > e)))
+  
+  idx = which.min(abs(alphaMeanGrid - alphaTarg))
+  
+  cvMeanControl = list(
+    etaMean = etaGrid[idx],
+    alphaMean = alphaMeanGrid[idx],
+    alphaSingles = rowMeans(TSbayes_Null > etaGrid[idx])
+  )
+  
+  elapsedTime = Sys.time() - startTime
+  
+  # Output
+  
+  return(list(trialDetails = list(N = N, 
+                                  K = K, 
+                                  nullScenarios = nullScenarios, 
+                                  gamma = gamma),
+              areSigma0Known = areSigma0Known,
+              initialSizePerArm = initialSizePerArm,
+              design = design,
+              parDesign = parDesign,
+              TSbayes_Null = TSbayes_Null,
+              alphaTarg = alphaTarg,
+              alphaMaxSingle = alphaMaxSingle,
+              cvStrongControl = cvStrongControl,
+              cvMeanControl = cvMeanControl,
+              elapsedTime = elapsedTime))
+}
