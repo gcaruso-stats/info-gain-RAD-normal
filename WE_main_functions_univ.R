@@ -940,6 +940,8 @@ selectKappa = function(kappaGrid,
                 power = power))
     
   }
+
+  stopCluster(cl)
   
   # Re-assemble matrices
   
