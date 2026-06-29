@@ -346,7 +346,7 @@ hist(critValue_FR$TSbayes_Null[1,])
 cutoffProb_FR = critValue_FR$cvMeanControl$etaMean
 cutoffProb_RAD = sapply(critValue_RAD, function(x) x$cvMeanControl$etaMean) 
 
-set.seed(123); muMatrix = t(replicate(30,rnorm(4,-4,4))) # here, we only consider S=30 scenarios for a quick illustration 
+set.seed(123); muMatrix = t(replicate(30,runif(4,-4,4))) # here, we only consider S=30 scenarios for a quick illustration 
 
 robustSelection_out = selectKappa(kappaGrid = kappaGrid, 
                                   muMatrix = muMatrix, 
