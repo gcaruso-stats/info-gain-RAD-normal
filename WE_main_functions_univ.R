@@ -603,7 +603,6 @@ runMultipleTrials = function(M = 5e2,
 #
 # Inputs:
 #   trials      - list of trial objects (output of runTrial)
-#   critValue   - vector of frequentist critical values (optional)
 #   cutoffProb  - vector of Bayesian posterior probability cutoffs
 #
 # Output:
@@ -617,10 +616,11 @@ computeOCs = function(trials, cutoffProb = NULL) {
   
   M = length(trials)
   K = trials[[1]]$summary$K
+  N = trials[[1]]$summary$N
   
   # Allocation summaries
   
-  nPercentMat = sapply(trials, function(x) x$summary$nByArm)
+  nPercentMat = sapply(trials, function(x) x$summary$nByArm)/N
   
   armPerc_average = rowMeans(nPercentMat)
   armPerc_SE = apply(nPercentMat, 1, sd) / sqrt(M)
@@ -634,7 +634,15 @@ computeOCs = function(trials, cutoffProb = NULL) {
   # Average responses by arm
   
   aveResponse = rowMeans(sapply(trials, function(x) x$summary$aveResponseByArm))
-  response_SE = apply(sapply(trials, function(x) x$summary$aveResponseByArm), 1, sd) / sqrt(M)
+  response_SE = apply(sapply(trials, function(x) x$summary$aveResponseByArm), 1, sd) / sqrt(M) # Monte Carlo Standard Error
+  
+  # Estimation performance (taking arm-specific average response as estimator)
+  
+  mu = trials[[1]]$trial$trialDetails$mu # underlying truth
+  aveResponse_bias = aveResponse - mu
+  aveResponse_var = apply(sapply(trials, function(x) x$summary$aveResponseByArm), 1, var)*(M-1)/M
+  aveResponse_mse = aveResponse_bias^2 + aveResponse_var
+  # mse = rowMeans((sapply(trials, function(x) x$summary$aveResponseByArm) - mu)^2) #alternative way
   
   # Average distance from the target
   
@@ -667,6 +675,9 @@ computeOCs = function(trials, cutoffProb = NULL) {
     armFinalModal = armFinalModal,
     aveResponse = aveResponse,
     response_SE = response_SE,
+    aveResponse_bias = aveResponse_bias,
+    aveResponse_var = aveResponse_var,
+    aveResponse_mse = aveResponse_mse,
     aveTargetDistance = aveTargetDistance,
     targetDistance_SE = targetDistance_SE,
     percSelectionBest = percSelectionBest,
@@ -742,7 +753,7 @@ criticalValueSearchBayes = function(M, K, N,
   # Simulate null scenarios
   
   bayesNull = foreach(i = seq_along(nullScenarios),
-                      .export = c("computeTrialSummaries", "runTrial", "prob.1bestVS2best"),
+                      .export = c("computeTrialSummaries", "runTrial", "prob.1bestVS2best", "informationGain"),
                       .inorder = TRUE) %dorng% {
     
     trials = replicate(M,
@@ -810,4 +821,177 @@ criticalValueSearchBayes = function(M, K, N,
               cvStrongControl = cvStrongControl,
               cvMeanControl = cvMeanControl,
               elapsedTime = elapsedTime))
+}
+
+
+## Robust selection of the penalization parameter kappa for the WE design ----
+#
+# This function optimizes values of kappa that optimize either the patient benefit
+# criterion or the power criterion (Section 4 of the paper, for more details).
+# This robust selection is performed across a wide set of alternative scenarios (specified in muMatrix). 
+#
+# Inputs:
+#   kappaGrid         - vector of kappa parameters to evaluate
+#   muMatrix          - S x K matrix where each row represents a scenario's true arm means
+#   M                 - number of simulated trial replicates per configuration
+#   N, K              - trial sample size and number of arms
+#   sigma0, gamma     - vectors of standard deviations and clinical targets (length K)
+#   p                 - exponent for standard deviation
+#   cutoffProb_FR     - single cutoff probability for the Fixed Randomization design
+#   cutoffProb_RAD    - vector of cutoff probabilities (must match length of kappaGrid)
+#   xi                - target proportion of scenarios where power rule must hold (default = 0.9)
+#   areSigma0Known    - logical; if TRUE, sigma0 is treated as known
+#   initialSizePerArm - burn-in observations per arm
+#   seed              - RNG seed for reproducibility
+#   ncores            - number of CPU cores to use (defaults to available cores - 1)
+#   printProgress     - logical; if TRUE, prints progress logs to the console
+#
+# Output:
+#   A list containing the optimal kappa parameters per each criterion, the raw performance metrics, 
+#   and few other additional information.
+
+selectKappa = function(kappaGrid,
+                       muMatrix,
+                       M = 5e2,
+                       N,
+                       K,
+                       sigma0,
+                       gamma,
+                       p,
+                       cutoffProb_FR,
+                       cutoffProb_RAD,
+                       xi = 0.9,
+                       areSigma0Known = TRUE,
+                       initialSizePerArm = 2,
+                       ncores = NULL,
+                       seed = 123,
+                       printProgress = TRUE) {
+  
+  if(length(cutoffProb_RAD)!=length(kappaGrid)){
+    stop("You need to provide a cut-off probability for each value of kappa in the grid.")
+  }
+  
+  overallStartTime = Sys.time() 
+  
+  S = nrow(muMatrix)
+  nKappa = length(kappaGrid)
+  
+  # Define consistent naming for dimensions
+  scenarioNames = paste0("Scenario_", 1:S)
+  kappaNames = paste0("kappa_", kappaGrid)
+  
+  ## =================================================================================
+  ## STEP 1: SIMULATION AND OPERATING CHARACTERISTICS FOR FR (BENCHMARK) AND WE DESIGN
+  ## =================================================================================
+  
+  # Parallel setup
+  
+  require(doParallel)
+  require(doRNG)
+  
+  if (is.null(ncores)) {
+    ncores = detectCores() - 1
+  }
+  
+  cl = makeCluster(ncores, outfile = "")
+  registerDoParallel(cl)
+  
+  if (printProgress) {
+    message("Running simulations across ", S, " scenarios using ", ncores, " cores...")
+  }
+  
+  # Computing operating characteristics
+  
+  out = foreach(s = 1:S, 
+                .export = c("computeTrialSummaries", "runTrial", "prob.1bestVS2best", "informationGain", "runMultipleTrials", "computeOCs"),
+                .inorder = TRUE) %dorng% {
+    
+    mu_s = muMatrix[s, ]
+    trueBestArm = which.min(abs(mu_s - gamma))
+    
+    # Run Fixed Randomization (FR) benchmark for this scenario
+    FR_trials = runMultipleTrials(
+      M = M, N = N, K = K, mu = mu_s, sigma0 = sigma0, gamma = gamma,
+      areSigma0Known = areSigma0Known, initialSizePerArm = initialSizePerArm,
+      design = "FR", parDesign = NULL, seed = seed, printTimeElaps = FALSE)
+    
+    FR_powerBenchmark = computeOCs(trials = FR_trials$trials, cutoffProb = cutoffProb_FR)$powerTwoComp
+    
+    # Run RAD across the grid of values for kappa for this scenario
+    patientBenefit = numeric(nKappa)
+    power = numeric(nKappa)
+    
+    for (i in seq_along(kappaGrid)) {
+      RAD_trials = runMultipleTrials(
+        M = M, N = N, K = K, mu = mu_s, sigma0 = sigma0, gamma = gamma,
+        areSigma0Known = areSigma0Known, initialSizePerArm = initialSizePerArm,
+        design = "RAD", parDesign = list(kappa = kappaGrid[i], p = p), 
+        seed = seed, printTimeElaps = FALSE)
+      
+      RAD_OC = computeOCs(trials = RAD_trials$trials, cutoffProb = cutoffProb_RAD[i])
+      
+      # Extract metrics 
+      patientBenefit[i] = RAD_OC$armPerc_average[trueBestArm]
+      power[i] = RAD_OC$powerTwoComp
+    }
+    
+    return(list(FR_powerBenchmark = FR_powerBenchmark,
+                patientBenefit = patientBenefit,
+                power = power))
+    
+  }
+  
+  # Re-assemble matrices
+  
+  FR_powerBenchmarkVec = sapply(out, function(x) x$FR_powerBenchmark)
+  patientBenefitMat = t(sapply(out, function(x) x$patientBenefit))
+  powerMat = t(sapply(out, function(x) x$power))
+  
+  ## ==========================================
+  ## STEP 2: COMPUTE OBJECTIVE FUNCTIONS
+  ## ==========================================
+  
+  if (printProgress) {
+    message("\nSimulations complete. Optimizing objective functions...")
+  }
+  
+  # Patient Benefit 
+  xBest = apply(patientBenefitMat, 1, max)
+  g_percExp = colMeans( sweep(patientBenefitMat, 1, xBest, "-")^2 )
+  
+  # Power metric
+  probRADvs80FR = colMeans(sweep(powerMat, 1, 0.8 * FR_powerBenchmarkVec, ">"))
+  
+  # Record the results in a table
+  resultsTable = data.frame(kappa = kappaGrid,
+                            g_percExp = g_percExp,
+                            probRADvs80FR = probRADvs80FR)
+  
+  ## ==========================================
+  ## STEP 3: SELECT BEST KAPPA PER CRITERION
+  ## ==========================================
+  
+  # Patient benefit criterion: kappa minimizing g_percExp
+  
+  optimalKappa_PB = kappaGrid[which.min(g_percExp)]
+  
+  # Power criterion: minimum kappa where RAD > 0.8*FR in at least (xi*100)% of scenarios
+  
+  validKappas = resultsTable$kappa[resultsTable$probRADvs80FR >= xi]
+  optimalKappa_power = if(length(validKappas) > 0) min(validKappas) else NA
+  
+  totalTime = Sys.time() - overallStartTime
+  if (printProgress) {
+    message("Execution finished. Total time: ", round(totalTime, 2), " ", attr(totalTime, "units"), "\n")
+  }
+  
+  return(list(
+    optimalKappa_PB = optimalKappa_PB,
+    optimalKappa_power = optimalKappa_power,
+    evaluationTable = resultsTable,
+    FR_powerBenchmarkVec = FR_powerBenchmarkVec,
+    patientBenefitMatrix = patientBenefitMat,
+    powerMat = powerMat,
+    totalTime = totalTime
+  ))
 }
