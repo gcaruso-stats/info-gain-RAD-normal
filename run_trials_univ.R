@@ -252,7 +252,7 @@ names(OCs) = names(multiRuns)
 OC_table = t(sapply(names(OCs), 
                     function(des) {
                       
-                      foo = c(percAllocBest = OCs[[des]]$armPerc_average[idxBest]/100,
+                      foo = c(percAllocBest = OCs[[des]]$armPerc_average[idxBest],
                               percAllocBest_SE = OCs[[des]]$armPerc_SE[idxBest],
                               correctBest = OCs[[des]]$percSelectionBest,
                               correctTop2 = OCs[[des]]$percSelectionTop2,
@@ -278,7 +278,7 @@ library(doRNG)
 # Simple trial setup
 K = 4                     
 N = 100                    
-M = 1e3         # small value for quick run (this should be ideally increase)
+M = 1e2         # small value for quick run (this should be ideally increased)
 gamma = rep(0, K)    
 sigma0 = c(rep(2,K-1), 4)
 
@@ -299,8 +299,72 @@ critValue_FR = criticalValueSearchBayes(M = M, K = K, N = N,
                                         design = "FR", parDesign = NULL,
                                         alphaTarg = 0.05,
                                         ncores = ncores,
-                                        seed = 123
-)
+                                        seed = 123)
+
+# Run critical value search (WE design)
+kappaGrid = seq(0.5, 1.5, 0.1) # you may think to consider a finer grid (but it will take more time to run - unless you parallelize over kappaGrid)
+p=1
+
+critValue_RAD = vector("list", length(kappaGrid))
+
+for(i in seq_along(critValue_RAD)){
+  
+  critValue_RAD[[i]] = criticalValueSearchBayes(M = M, K = K, N = N,
+                                                nullScenarios = nullScenarios, gamma = gamma,
+                                                areSigma0Known = TRUE, initialSizePerArm = 5,
+                                                design = "RAD", parDesign = list(kappa=kappaGrid[i], p=p),
+                                                alphaTarg = 0.05,
+                                                ncores = ncores,
+                                                seed = 123)
+  print(critValue_RAD[[i]]$elapsedTime)
+  
+}
+
+
+
+## Inspection of results (for FR design)
+
+# cut-off probability values
+
+critValue_FR$cvStrongControl$etaMax # strong control of TIE at 5%
+critValue_FR$cvMeanControl$etaMean # mean control of TIE at 5%
+
+# scenario-specific TIE rates with strong control at 5%
+critValue_FR$cvStrongControl$alphaSingles   
+
+# scenario-specific TIE rates with mean control at 5%
+critValue_FR$cvMeanControl$alphaSingles   
+
+# prob.1bestVS2best (piHat) under H0: mu_j-gamma=0, for all j
+hist(critValue_FR$TSbayes_Null[1,])  
+
+
+## ==========================
+## Selection of kappa
+## ==========================
+
+cutoffProb_FR = critValue_FR$cvMeanControl$etaMean
+cutoffProb_RAD = sapply(critValue_RAD, function(x) x$cvMeanControl$etaMean) 
+
+set.seed(123); muMatrix = t(replicate(30,rnorm(4,-4,4))) # here, we only consider S=30 scenarios for a quick illustration 
+
+robustSelection_out = selectKappa(kappaGrid = kappaGrid, 
+                                  muMatrix = muMatrix, 
+                                  M = M, 
+                                  N = N, 
+                                  K = K, 
+                                  sigma0 = sigma0, 
+                                  gamma = gamma, 
+                                  p = p, 
+                                  cutoffProb_FR = cutoffProb_FR, 
+                                  cutoffProb_RAD = cutoffProb_RAD, 
+                                  areSigma0Known = T, 
+                                  initialSizePerArm = initialSizePerArm,
+                                  ncores = ncores,
+                                  seed = 123)
+
+robustSelection_out$optimalKappa_PB # optimal kappa wrt patient benefit metric
+robustSelection_out$optimalKappa_power # optimal kappa wrt power metric
 
 
 ## Inspection of results
