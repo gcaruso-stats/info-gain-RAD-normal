@@ -365,20 +365,3 @@ robustSelection_out = selectKappa(kappaGrid = kappaGrid,
 
 robustSelection_out$optimalKappa_PB # optimal kappa wrt patient benefit metric
 robustSelection_out$optimalKappa_power # optimal kappa wrt power metric
-
-
-## Inspection of results
-
-# cut-off probability values
-
-critValue_FR$cvStrongControl$etaMax # strong control of TIE at 5%
-critValue_FR$cvMeanControl$etaMean # mean control of TIE at 5%
-
-# scenario-specific TIE rates with strong control at 5%
-critValue_FR$cvStrongControl$alphaSingles   
-
-# scenario-specific TIE rates with mean control at 5%
-critValue_FR$cvMeanControl$alphaSingles   
-
-# prob.1bestVS2best (piHat) under H0: mu_j-gamma=0, for all j
-hist(critValue_FR$TSbayes_Null[1,])  
